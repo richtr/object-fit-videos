@@ -20,6 +20,7 @@
  * @author   Todd Miller <todd.miller@tricomb2b.com>
  * @version  1.0.2
  * @changelog
+ * 2017-08-02 - Rename throttle function to watchForResize to observe _actual_ viewport dimension changes.
  * 2016-08-19 - Adds object-position support.
  * 2016-08-19 - Add throttle function for more performant resize events
  * 2016-08-19 - Initial release with object-fit support, and
@@ -39,7 +40,7 @@ var objectFitVideos = function (videos) {
 
   if (!supportsObjectFit || !supportsObjectPosition) {
     initialize(videos);
-    throttle('resize', 'optimizedResize');
+    watchForResize();
   }
 
   /**
@@ -132,7 +133,7 @@ var objectFitVideos = function (videos) {
 
     // set up the event handlers
     $el.addEventListener('loadedmetadata', startWork);
-    window.addEventListener('optimizedResize', startWork);
+    window.addEventListener('manualResize', startWork);
 
     // we may have missed the loadedmetadata event, so if the video has loaded
     // enough data, just drop the event listener and execute
@@ -248,37 +249,42 @@ var objectFitVideos = function (videos) {
   }
 
   /**
-   * Throttle an event with RequestAnimationFrame API for better performance
-   * @param  {string} type The event to throttle
-   * @param  {string} name Custom event name to listen for
-   * @param  {object} obj  Optional object to attach the event to
+   * Watch for viewport resize events and throttle with RequestAnimationFrame
+   * API for better performance
+   * @param  {object} obj  Optional object to fire our custom resize event on
    */
-  function throttle (type, name, obj) {
+  function watchForResize (obj) {
     obj = obj || window;
-    var running = false,
-        evt     = null;
 
-    // IE does not support the CustomEvent constructor
-    // so if that fails do it the old way
-    try {
-      evt = new CustomEvent(name);
-    } catch (e) {
-      evt = document.createEvent('Event');
-      evt.initEvent(name, true, true);
-    }
+    var name = "manualResize", // event name to dispatch against obj
+        evt = null,
+        prevWidth = document.clientWidth,
+        prevHeight = document.clientHeight;
 
-    var func = function () {
-      if (running) return;
+    window.requestAnimationFrame(function tick() {
+      var width = document.clientWidth,
+          height = document.clientHeight;
 
-      running = true;
-      requestAnimationFrame(function () {
+      if (width !== prevWidth || height !== prevHeight) {
+        prevWidth = width;
+        prevHeight = height;
+
+        // IE does not support the CustomEvent constructor
+        // so if that fails do it the old way
+        try {
+          evt = new CustomEvent(name);
+        } catch (e) {
+          evt = document.createEvent('Event');
+          evt.initEvent(name, true, true);
+        }
+
         obj.dispatchEvent(evt);
-        running = false;
-      });
-    };
+      }
 
-    obj.addEventListener(type, func);
+      window.requestAnimationFrame(tick);
+    });
   }
+
 };
 
 if (typeof module !== 'undefined' && typeof module.exports !== 'undefined')
